@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Display;
-use std::fs;
-use std::io::{BufRead, BufReader};
-use std::str::from_utf8;
+use std::io::{BufRead, BufReader, Write};
+use std::str::FromStr;
 use std::time::Instant;
+use std::{fs, io};
 
 struct State {
     min: f64,
@@ -43,20 +43,13 @@ impl State {
         self.sum += temp;
         self.count += 1;
     }
-
-    fn merge(&mut self, other: Self) {
-        self.min = self.min.min(other.min);
-        self.max = self.max.max(other.max);
-        self.sum += other.sum;
-        self.count += other.count;
-    }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let file = fs::File::open("./measurements.txt")?;
+fn main() {
+    let file = fs::File::open("./measurements.txt").unwrap();
 
     let mut reader = BufReader::new(file);
-    let mut buffer = Vec::new();
+    let mut buffer = String::new();
 
     let mut map: HashMap<String, State> = HashMap::new();
     let mut count: u64 = 0;
@@ -65,31 +58,39 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         buffer.clear();
-        let n = reader.read_until(b'\n', &mut buffer)?;
+        let n = reader.read_line(&mut buffer).unwrap();
         if n == 0 {
             break;
         }
 
-        buffer.pop();
-        let string = from_utf8(&buffer)?;
-        let (city, temp) = string.split_once(';').unwrap();
-        let temp = temp.parse::<f64>()?;
+        let delim = buffer.rfind(';').unwrap();
+        let temp = unsafe {
+            buffer
+                .get_unchecked(delim + 1..buffer.len() - 1)
+                .parse::<f64>()
+                .unwrap()
+        };
 
-        map.entry(city.to_string()).or_default().update(temp);
+        let city = unsafe { String::from_str(buffer.get_unchecked(..delim)).unwrap() };
+        map.entry(city).or_default().update(temp);
         count += 1;
     }
 
     let mut result: Vec<_> = map.into_iter().collect();
     result.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-    result.into_iter().for_each(|(k, v)| println!("{k}={v}"));
 
-    let elapsed = now.elapsed().as_secs_f64();
-    println!(
-        "Processed {:e} entries in {:.3e} seconds ({:.3e} entry/s)",
-        count,
-        elapsed,
-        elapsed / (count as f64)
-    );
-
-    Ok(())
+    // let mut stdout = io::stdout().lock();
+    // result
+    //     .into_iter()
+    //     .for_each(|(k, v)| writeln!(&mut stdout, "{k}={v}").unwrap());
+    //
+    // let elapsed = now.elapsed().as_secs_f64();
+    // writeln!(
+    //     &mut stdout,
+    //     "Processed {:e} entries in {:.3e} seconds ({:.3e} entry/s)",
+    //     count,
+    //     elapsed,
+    //     elapsed / (count as f64)
+    // )
+    // .unwrap();
 }

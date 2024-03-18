@@ -13,3 +13,4 @@ required-features = ["generate"]
 [dependencies]
 rand = { version = "0.8.5", optional = true }
 rand_distr = { version = "0.4.3", optional = true }
+rayon = "1.9.0"
